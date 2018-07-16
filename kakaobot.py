@@ -4,21 +4,18 @@ import os
 from flask import Flask,request,jsonify
 import sys
 import io
+import urllib.parse as rep
 sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding = 'utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding = 'utf-8')
+from bs4 import BeautifulSoup
 
-#######
+Mbase = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=1&ie=utf8&query="
+Mquote = rep.quote_plus("숭실대학교 미세먼지")
+Murl= Mbase + Mquote
 
-from selenium import webdriver
-import time
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
+Wbase = "https://weather.naver.com/rgn/townWetr.nhn?naverRgnCd=09590102"
 
-chrome_options = Options()
-chrome_options.add_argument('--headless')#cli
 
-weather = webdriver.Chrome(chrome_options = chrome_options, executable_path ='E:\WorkSpace\section3\webdriver\chrome\chromedriver')
-weather.implicitly_wait(1)
 #################################system Setting################################
 
 app = Flask(__name__)
@@ -27,8 +24,11 @@ app = Flask(__name__)
 def Keyboard():
 
     dataSend = {
+            "message":{
+                "text":"매일 아침 8시에 간략한 정보를 드리며,\n원하시는 경우에는 버튼을 눌러 서비스를 이용하세요\n BETA Version"
+            },
         "type" : "buttons",
-        "buttons" : ["현재 날씨", "오전 온도","오후 온도"]
+        "buttons" : ["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
     }
     return jsonify(dataSend)
 
@@ -38,49 +38,154 @@ def Message():
     dataReceive = request.get_json()
     content = dataReceive['content']
     if content == u"현재 날씨":
-        weather.get("https://weather.naver.com/rgn/townWetr.nhn?naverRgnCd=09590102")
-        weather.implicitly_wait(1)
+        import urllib.request as req
+        Wres = req.urlopen(Wbase).read()
+        Wsoup = BeautifulSoup(Wres, "html.parser")
 
-        #################네이버 날씨에서 동작구 날씨 가져오기################
-        now = weather.find_element_by_css_selector('#content > div.w_now2 > ul > li:nth-child(1) > div > em')  #
+        now = Wsoup.select_one('div.w_now2 em')
 
         dataSend = {
             "message":{
-                "text":now.text
+                "text":now.text.strip()
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도"]
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
             }
         }
     elif content ==u"오전 온도":
-        weather.get("https://weather.naver.com/rgn/townWetr.nhn?naverRgnCd=09590102")
-        weather.implicitly_wait(1)
-        #################네이버 날씨에서 동작구 날씨 가져오기################
-        TATemp = weather.find_element_by_css_selector('#content > table.tbl_weather.tbl_today3 > tbody > tr > td:nth-child(1) > div:nth-child(1) > ul > li.nm')#오전 강수량
+        import urllib.request as req
+        Wres = req.urlopen(Wbase).read()
+        Wsoup = BeautifulSoup(Wres, "html.parser")
 
+        ATemp = Wsoup.select_one('table.tbl_weather ul.text')
         dataSend = {
             "message":{
-                "text":TATemp.text
+                "text":ATemp.text
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도"]
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
             }
         }
     elif content ==u"오후 온도":
-        weather.get("https://weather.naver.com/rgn/townWetr.nhn?naverRgnCd=09590102")
-        weather.implicitly_wait(1)
-        #################네이버 날씨에서 동작구 날씨 가져오기################
-        TBTemp = weather.find_element_by_css_selector('#content > table.tbl_weather.tbl_today3 > tbody > tr > td:nth-child(1) > div:nth-child(3) > ul > li.nm ')#오전 날씨
+        import urllib.request as req
+        Wres = req.urlopen(Wbase).read()
+        Wsoup = BeautifulSoup(Wres, "html.parser")
 
+        BTemp = Wsoup.select_one('table.tbl_weather div:nth-of-type(2) ul.text ')
+        dataSend = {
+            "message":{
+                "text":BTemp.text
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"내일 날씨":
+        dataSend = {
+            "message":{
+                "text":"오전 혹은 오후를 클릭해주세요"
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["내일 오후","내일 오전","취소"]
+            }
+        }
+    elif content ==u"내일 오후":
+        import urllib.request as req
+        Wres = req.urlopen(Wbase).read()
+        Wsoup = BeautifulSoup(Wres, "html.parser")
+
+        TBTemp = Wsoup.select_one('table.tbl_weather td:nth-of-type(2) div:nth-of-type(2) ul.text ')
         dataSend = {
             "message":{
                 "text":TBTemp.text
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도"]
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"내일 오전":
+        import urllib.request as req
+        Wres = req.urlopen(Wbase).read()
+        Wsoup = BeautifulSoup(Wres, "html.parser")
+
+        TBTemp = Wsoup.select_one('table.tbl_weather td:nth-of-type(2) div:nth-of-type(1) ul.text ')
+        dataSend = {
+            "message":{
+                "text":TBTemp.text
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"미세먼지":
+        dataSend = {
+            "message":{
+                "text":"원하시는 기능을 선택해 주세요\n0-30 > 좋음\n30-80 > 보통\n80-150 > 나쁨\n 그 이상 > 매우 나쁨"
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":['현재 미세먼지','24시간 평균','초미세먼지',"취소"]
+            }
+        }
+    elif content ==u"현재 미세먼지":
+        import urllib.request as req
+        Mres = req.urlopen(Murl).read()
+        Msoup = BeautifulSoup(Mres, "html.parser")
+        NowmicroDust = Msoup.select('div.air_detail span.figure')
+
+        dataSend = {
+            "message":{
+                "text":NowmicroDust[0].text
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"24시간 평균":
+        import urllib.request as req
+        Mres = req.urlopen(Murl).read()
+        Msoup = BeautifulSoup(Mres, "html.parser")
+        AlldaymicroDust = Msoup.select('div.air_detail span.figure')
+
+        dataSend = {
+            "message":{
+                "text":AlldaymicroDust[1].text
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"초미세먼지":
+        import urllib.request as req
+        Mres = req.urlopen(Murl).read()
+        Msoup = BeautifulSoup(Mres, "html.parser")
+        nanoDust = Msoup.select_one('div.all_state span.state_info')
+
+        dataSend = {
+            "message":{
+                "text":nanoDust.text
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+            }
+        }
+    elif content ==u"취소":
+        dataSend = {
+            "message":{
+                "text":"메인메뉴로 갑니다"
+            },
+            "keyboard":{
+                "type":"buttons",
+                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
             }
         }
     return jsonify(dataSend)
