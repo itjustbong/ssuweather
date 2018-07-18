@@ -8,14 +8,15 @@ import urllib.parse as rep
 sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding = 'utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding = 'utf-8')
 from bs4 import BeautifulSoup
+import requests
+import json
 
-Mbase = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=1&ie=utf8&query="
-Mquote = rep.quote_plus("숭실대학교 미세먼지")
-Murl= Mbase + Mquote
+apikey = '45feff3b8b958fce29d832dcd3afeb63'
+
+cities = ["Seoul,KR"]
 
 Wbase = "https://weather.naver.com/rgn/townWetr.nhn?naverRgnCd=09590102"
-
-
+Mbase = "http://openapi.seoul.go.kr:8088/54775266536e6564393578574d4c41/json/TimeAverageAirQuality/1/25/"
 #################################system Setting################################
 
 app = Flask(__name__)
@@ -28,7 +29,7 @@ def Keyboard():
                 "text":"매일 아침 8시에 간략한 정보를 드리며,\n원하시는 경우에는 버튼을 눌러 서비스를 이용하세요\n BETA Version"
             },
         "type" : "buttons",
-        "buttons" : ["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+        "buttons" : ["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
     }
     return jsonify(dataSend)
 
@@ -50,37 +51,30 @@ def Message():
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
-    elif content ==u"오전 온도":
-        import urllib.request as req
-        Wres = req.urlopen(Wbase).read()
-        Wsoup = BeautifulSoup(Wres, "html.parser")
+    elif content ==u"오늘 날씨 요약":
+        api = "http://api.openweathermap.org/data/2.5/weather?q={city}&APPID={key}"
 
-        ATemp = Wsoup.select_one('table.tbl_weather ul.text')
+        k2c = lambda k: k - 273.15
+
+        for name in cities:
+            url = api.format(city=name, key=apikey)
+
+            r = requests.get(url)
+
+            data = json.loads(r.text)
+
+            info = "날씨 요약 > " + data["weather"][0]["description"] + '\n현재기온 > '+ str(int(k2c(data["main"]["temp"]))) + '\n최저 기온 > '+ str(int(k2c(data["main"]["temp_min"]))) + '\n최고 기온 > '+ str(int(k2c(data["main"]["temp_max"]))) + "\n습도 > " + str(int(data["main"]["humidity"]))
+
         dataSend = {
             "message":{
-                "text":ATemp.text
+                "text":info
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
-            }
-        }
-    elif content ==u"오후 온도":
-        import urllib.request as req
-        Wres = req.urlopen(Wbase).read()
-        Wsoup = BeautifulSoup(Wres, "html.parser")
-
-        BTemp = Wsoup.select_one('table.tbl_weather div:nth-of-type(2) ul.text ')
-        dataSend = {
-            "message":{
-                "text":BTemp.text
-            },
-            "keyboard":{
-                "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
     elif content ==u"내일 날씨":
@@ -105,7 +99,7 @@ def Message():
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
     elif content ==u"내일 오전":
@@ -120,7 +114,7 @@ def Message():
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
     elif content ==u"미세먼지":
@@ -130,54 +124,60 @@ def Message():
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":['현재 미세먼지','24시간 평균','초미세먼지',"취소"]
+                "buttons":['현재 미세먼지',"취소"]
             }
         }
     elif content ==u"현재 미세먼지":
-        import urllib.request as req
-        Mres = req.urlopen(Murl).read()
-        Msoup = BeautifulSoup(Mres, "html.parser")
-        NowmicroDust = Msoup.select('div.air_detail span.figure')
+        Mbase = "http://openapi.seoul.go.kr:8088/54775266536e6564393578574d4c41/json/TimeAverageAirQuality/1/25/"
+        today = datetime.today().strftime("%Y%m%d")
+        Mquote = rep.quote_plus(today)
+        url= Mbase + Mquote  # 현재 날짜 가져오기
+
+        response_body = requests.get(url).json()
+
+        dust = int(response_body['TimeAverageAirQuality']['row'][0]['PM10'])
+
+        output = "미세먼지 농도 >> "+str(dust)
 
         dataSend = {
             "message":{
-                "text":NowmicroDust[0].text
+                "text":output
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
-    elif content ==u"24시간 평균":
-        import urllib.request as req
-        Mres = req.urlopen(Murl).read()
-        Msoup = BeautifulSoup(Mres, "html.parser")
-        AlldaymicroDust = Msoup.select('div.air_detail span.figure')
-
-        dataSend = {
-            "message":{
-                "text":AlldaymicroDust[1].text
-            },
-            "keyboard":{
-                "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
-            }
-        }
-    elif content ==u"초미세먼지":
-        import urllib.request as req
-        Mres = req.urlopen(Murl).read()
-        Msoup = BeautifulSoup(Mres, "html.parser")
-        nanoDust = Msoup.select_one('div.all_state span.state_info')
-
-        dataSend = {
-            "message":{
-                "text":nanoDust.text
-            },
-            "keyboard":{
-                "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
-            }
-        }
+    # elif content ==u"24시간 평균":
+    #     import urllib.request as req
+    #     Mres = req.urlopen(Murl).read()
+    #     Msoup = BeautifulSoup(Mres, "html.parser")
+    #     AlldaymicroDust = Msoup.select('div.air_detail span.figure')
+    #
+    #     dataSend = {
+    #         "message":{
+    #             "text":AlldaymicroDust[1].text
+    #         },
+    #         "keyboard":{
+    #             "type":"buttons",
+    #             "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+    #         }
+    #     }
+    # elif content ==u"초미세먼지":
+    #     import urllib.request as req
+    #     Mres = req.urlopen(Murl).read()
+    #     Msoup = BeautifulSoup(Mres, "html.parser")
+    #     nanoDust = Msoup.select_one('div.all_state span.state_info')
+    #
+    #     dataSend = {
+    #         "message":{
+    #             "text":nanoDust.text
+    #         },
+    #         "keyboard":{
+    #             "type":"buttons",
+    #             "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+    #         }
+    #     }
     elif content ==u"취소":
         dataSend = {
             "message":{
@@ -185,7 +185,7 @@ def Message():
             },
             "keyboard":{
                 "type":"buttons",
-                "buttons":["현재 날씨", "오전 온도","오후 온도","내일 날씨","미세먼지"]
+                "buttons":["현재 날씨", "오늘 날씨 요약","내일 날씨","미세먼지"]
             }
         }
     return jsonify(dataSend)
